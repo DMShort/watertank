@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watershed Tank Node – Wiring Schematic</title>
+<style>
+  :root{
+    --ink:#1d2430; --muted:#5d6675; --line:#d9dde4; --paper:#fbfaf7; --panel:#ffffff;
+    --v5:#d0342c; --v33:#e08a00; --gnd:#2b2f36; --trig:#1f6fd1; --echo:#1a9a5a;
+    --sda:#7a3fc4; --scl:#0f8f9c; --dq:#c2399a; --vbat:#8a5a12; --rf:#6b7280;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 48px}
+  h1{font-size:24px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  svg{width:100%;height:auto;display:block}
+  svg text{font-family:inherit}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:12px 4px 0;font-size:13px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{display:inline-block;width:22px;height:3px;border-radius:2px}
+  h2{font-size:17px;margin:28px 0 10px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f3f4f6;font-weight:600}
+  tr:last-child td{border-bottom:none}
+  code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.92em;background:#f1f2f4;padding:1px 5px;border-radius:4px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+  ul{margin:0;padding-left:20px}
+  li{margin:4px 0}
+  .warn{border-left:4px solid var(--v5);background:#fff5f4;padding:10px 14px;border-radius:6px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Watershed tank node: wiring schematic</h1>
+  <p class="sub">Heltec WiFi LoRa 32 V2 with JSN-SR04T level sensor, DS18B20 temperature probe, external SSD1306 OLED and battery sense. Pins match <code>firmware/tank_node/tank_node.ino</code>.</p>
+
+  <div class="card">
+  <svg viewBox="0 0 1010 690" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Wiring schematic of the tank node">
+    <defs>
+      <g id="gnd"><line x1="0" y1="0" x2="0" y2="6" stroke="#2b2f36" stroke-width="2"/><line x1="-11" y1="6" x2="11" y2="6" stroke="#2b2f36" stroke-width="2"/><line x1="-7" y1="10" x2="7" y2="10" stroke="#2b2f36" stroke-width="2"/><line x1="-3" y1="14" x2="3" y2="14" stroke="#2b2f36" stroke-width="2"/></g>
+    </defs>
+    <style>
+      .w{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+      .box{fill:#f7f8fa;stroke:#1d2430;stroke-width:1.6}
+      .board{fill:#eef4ec;stroke:#1d2430;stroke-width:1.8}
+      .res{fill:#fff;stroke:#1d2430;stroke-width:1.6}
+      .pin{font-size:12px;fill:#1d2430;font-weight:600}
+      .lbl{font-size:12px;fill:#5d6675}
+      .val{font-size:12.5px;fill:#1d2430;font-weight:600}
+      .ttl{font-size:15px;font-weight:700;fill:#1d2430}
+      .dot{fill:#1d2430}
+    </style>
+
+    <!-- ===== Heltec board ===== -->
+    <rect class="board" x="430" y="140" width="240" height="470" rx="10"/>
+    <text class="ttl" x="550" y="415" text-anchor="middle">Heltec WiFi LoRa 32 V2</text>
+    <text class="lbl" x="550" y="434" text-anchor="middle">ESP32 + SX1276 (onboard LoRa)</text>
+    <text class="lbl" x="550" y="590" text-anchor="middle">Micro-USB = 5 V bench power</text>
+    <!-- left pins -->
+    <g class="pin"><text x="440" y="204">5V</text><text x="440" y="254">GND</text><text x="440" y="324">GPIO25</text><text x="440" y="394">GPIO32</text><text x="440" y="544">GPIO34 (ADC1)</text></g>
+    <!-- right pins -->
+    <g class="pin" text-anchor="end"><text x="660" y="204">3V3</text><text x="660" y="254">GND</text><text x="660" y="324">GPIO21 (SDA)</text><text x="660" y="374">GPIO22 (SCL)</text><text x="660" y="534">GPIO4</text></g>
+
+    <!-- antenna -->
+    <path class="w" stroke="var(--rf)" d="M550 140 V96 M550 96 L534 70 M550 96 L566 70 M550 96 V68"/>
+    <text class="val" x="576" y="82">LoRa antenna (915 MHz)</text>
+    <text class="lbl" x="576" y="98">fit before powering up</text>
+
+    <!-- ===== JSN-SR04T ===== -->
+    <circle cx="140" cy="108" r="22" fill="#fff" stroke="#1d2430" stroke-width="1.6"/>
+    <circle cx="140" cy="108" r="11" fill="#e5e7eb" stroke="#1d2430" stroke-width="1.2"/>
+    <line x1="140" y1="130" x2="140" y2="170" stroke="#1d2430" stroke-width="2" stroke-dasharray="4 3"/>
+    <text class="lbl" x="172" y="98">waterproof transducer</text>
+    <text class="lbl" x="172" y="114">(tank lid, facing down)</text>
+    <rect class="box" x="50" y="170" width="180" height="250" rx="8"/>
+    <text class="ttl" x="62" y="296">JSN-SR04T</text>
+    <text class="lbl" x="62" y="314">driver board</text>
+    <g class="pin" text-anchor="end"><text x="222" y="204">5V</text><text x="222" y="254">GND</text><text x="222" y="324">Trig</text><text x="222" y="394">Echo</text></g>
+
+    <!-- JSN wires -->
+    <path class="w" stroke="var(--v5)" d="M230 200 H430"/>
+    <path class="w" stroke="var(--gnd)" d="M230 250 H430"/>
+    <path class="w" stroke="var(--trig)" d="M230 320 H430"/>
+    <path class="w" stroke="var(--echo)" d="M230 390 H250 M290 390 H430 M310 390 V400 M310 440 V448"/>
+    <rect class="res" x="250" y="383" width="40" height="14" rx="2"/>
+    <text class="val" x="270" y="376" text-anchor="middle">1 kΩ</text>
+    <rect class="res" x="303" y="400" width="14" height="40" rx="2"/>
+    <text class="val" x="324" y="424">2 kΩ</text>
+    <circle class="dot" cx="310" cy="390" r="4"/>
+    <use href="#gnd" x="310" y="448"/>
+    <text class="lbl" x="298" y="444" text-anchor="end">divider: 5 V echo → 3.3 V</text>
+
+    <!-- ===== Battery sense ===== -->
+    <path class="w" stroke="var(--v5)" d="M120 520 V478 H380 V488"/>
+    <g stroke="#1d2430" stroke-width="2.4">
+      <line x1="98" y1="520" x2="142" y2="520"/><line x1="110" y1="532" x2="130" y2="532" stroke-width="4"/>
+      <line x1="98" y1="544" x2="142" y2="544"/><line x1="110" y1="556" x2="130" y2="556" stroke-width="4"/>
+    </g>
+    <text class="val" x="150" y="526">+</text>
+    <text class="val" x="40" y="530" text-anchor="middle">Li-ion</text>
+    <text class="lbl" x="40" y="546" text-anchor="middle">3.7 V cell</text>
+    <path class="w" stroke="var(--gnd)" d="M120 556 V600"/>
+    <use href="#gnd" x="120" y="600"/>
+    <text class="lbl" x="172" y="470">also feeds Heltec battery JST (+)</text>
+
+    <rect class="res" x="373" y="488" width="14" height="40" rx="2"/>
+    <text class="val" x="394" y="506">R1</text><text class="lbl" x="394" y="521">100k</text>
+    <path class="w" stroke="var(--vbat)" d="M380 528 V552 M380 540 H430 M380 540 H330 V563 M330 571 V600 M380 592 V600"/>
+    <circle class="dot" cx="380" cy="540" r="4"/>
+    <rect class="res" x="373" y="552" width="14" height="40" rx="2"/>
+    <text class="val" x="394" y="570">R2</text><text class="lbl" x="394" y="585">100k</text>
+    <g stroke="#1d2430" stroke-width="2.4"><line x1="318" y1="563" x2="342" y2="563"/><line x1="318" y1="571" x2="342" y2="571"/></g>
+    <text class="val" x="312" y="584" text-anchor="end">100 nF</text>
+    <use href="#gnd" x="330" y="600"/>
+    <use href="#gnd" x="380" y="600"/>
+
+    <!-- ===== Right side rails ===== -->
+    <path class="w" stroke="var(--v33)" d="M670 200 H790 M720 200 V470 H830"/>
+    <path class="w" stroke="var(--gnd)" d="M670 250 H790 M745 250 V590 H830"/>
+    <circle class="dot" cx="720" cy="200" r="4"/>
+    <circle class="dot" cx="745" cy="250" r="4"/>
+    <!-- SDA / SCL with hops over the rails -->
+    <path class="w" stroke="var(--sda)" d="M670 320 H714 A6 6 0 0 1 726 320 H739 A6 6 0 0 1 751 320 H790"/>
+    <path class="w" stroke="var(--scl)" d="M670 370 H714 A6 6 0 0 1 726 370 H739 A6 6 0 0 1 751 370 H790"/>
+
+    <!-- OLED -->
+    <rect class="box" x="790" y="170" width="190" height="230" rx="8"/>
+    <rect x="852" y="258" width="112" height="62" rx="3" fill="#0f172a"/>
+    <text x="862" y="284" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,Consolas,monospace">Level: 72 %</text>
+    <text x="862" y="300" font-size="10.5" fill="#7dd3fc" font-family="ui-monospace,Consolas,monospace">Temp:  21.4 C</text>
+    <text class="ttl" x="908" y="346" text-anchor="middle">SSD1306 OLED</text>
+    <text class="lbl" x="908" y="364" text-anchor="middle">0.96" I²C, addr 0x3C</text>
+    <g class="pin"><text x="798" y="204">VCC</text><text x="798" y="254">GND</text><text x="798" y="324">SDA</text><text x="798" y="374">SCL</text></g>
+
+    <!-- DS18B20 -->
+    <path class="w" stroke="var(--dq)" d="M670 530 H739 A6 6 0 0 1 751 530 H830"/>
+    <rect class="res" x="763" y="482" width="14" height="36" rx="2"/>
+    <path class="w" stroke="var(--v33)" d="M770 470 V482"/>
+    <path class="w" stroke="var(--dq)" d="M770 518 V530"/>
+    <circle class="dot" cx="770" cy="470" r="4"/>
+    <circle class="dot" cx="770" cy="530" r="4"/>
+    <text class="val" x="784" y="498">4.7 kΩ</text>
+    <text class="lbl" x="784" y="513">pull-up</text>
+    <rect class="box" x="830" y="440" width="150" height="170" rx="8"/>
+    <g class="pin"><text x="838" y="474">VDD</text><text x="838" y="534">DQ</text><text x="838" y="594">GND</text></g>
+    <text class="ttl" x="905" y="500" text-anchor="middle">DS18B20</text>
+    <text class="lbl" x="905" y="518" text-anchor="middle">waterproof probe</text>
+    <g font-size="11.5">
+      <circle cx="880" cy="551" r="5" fill="#d0342c"/><text x="890" y="555" fill="#5d6675">red = VDD</text>
+      <circle cx="880" cy="569" r="5" fill="#e6c200"/><text x="890" y="573" fill="#5d6675">yellow = DQ</text>
+      <circle cx="880" cy="587" r="5" fill="#2b2f36"/><text x="890" y="591" fill="#5d6675">black = GND</text>
+    </g>
+
+    <!-- pin dots on board -->
+    <g class="dot">
+      <circle cx="430" cy="200" r="3.5"/><circle cx="430" cy="250" r="3.5"/><circle cx="430" cy="320" r="3.5"/><circle cx="430" cy="390" r="3.5"/><circle cx="430" cy="540" r="3.5"/>
+      <circle cx="670" cy="200" r="3.5"/><circle cx="670" cy="250" r="3.5"/><circle cx="670" cy="320" r="3.5"/><circle cx="670" cy="370" r="3.5"/><circle cx="670" cy="530" r="3.5"/>
+    </g>
+    <text class="lbl" x="1000" y="684" text-anchor="end">Wires that cross with a hop (⌒) are not connected. Dots mark joins.</text>
+  </svg>
+  <div class="legend">
+    <span><i style="background:var(--v5)"></i>5 V / battery +</span>
+    <span><i style="background:var(--v33)"></i>3.3 V</span>
+    <span><i style="background:var(--gnd)"></i>GND</span>
+    <span><i style="background:var(--trig)"></i>Trig</span>
+    <span><i style="background:var(--echo)"></i>Echo</span>
+    <span><i style="background:var(--sda)"></i>SDA</span>
+    <span><i style="background:var(--scl)"></i>SCL</span>
+    <span><i style="background:var(--dq)"></i>1-Wire data</span>
+    <span><i style="background:var(--vbat)"></i>Battery sense</span>
+  </div>
+  </div>
+
+  <h2>Connection list</h2>
+  <table>
+    <tr><th>From</th><th>To (Heltec pin)</th><th>Via</th><th>Firmware define</th></tr>
+    <tr><td>JSN-SR04T 5V</td><td>5V</td><td>direct</td><td>–</td></tr>
+    <tr><td>JSN-SR04T GND</td><td>GND</td><td>direct</td><td>–</td></tr>
+    <tr><td>JSN-SR04T Trig</td><td>GPIO25</td><td>direct (3.3 V trigger is enough)</td><td><code>PIN_TRIG 25</code></td></tr>
+    <tr><td>JSN-SR04T Echo</td><td>GPIO32</td><td>1 kΩ in series, 2 kΩ from GPIO32 to GND</td><td><code>PIN_ECHO 32</code></td></tr>
+    <tr><td>DS18B20 VDD (red)</td><td>3V3</td><td>direct</td><td>–</td></tr>
+    <tr><td>DS18B20 DQ (yellow)</td><td>GPIO4</td><td>4.7 kΩ pull-up from DQ to 3V3</td><td><code>PIN_DS18B20 4</code></td></tr>
+    <tr><td>DS18B20 GND (black)</td><td>GND</td><td>direct</td><td>–</td></tr>
+    <tr><td>OLED VCC / GND</td><td>3V3 / GND</td><td>direct</td><td>–</td></tr>
+    <tr><td>OLED SDA / SCL</td><td>GPIO21 / GPIO22</td><td>direct</td><td><code>PIN_I2C_SDA 21</code>, <code>PIN_I2C_SCL 22</code></td></tr>
+    <tr><td>Battery +</td><td>GPIO34</td><td>R1 100 kΩ to GPIO34, R2 100 kΩ GPIO34 to GND, 100 nF GPIO34 to GND</td><td><code>PIN_VBAT 34</code>, <code>VBAT_DIVIDER_RATIO 2.0</code></td></tr>
+    <tr><td>LoRa antenna</td><td>u.FL / SMA on board</td><td>onboard SX1276, nothing to wire</td><td>–</td></tr>
+  </table>
+
+  <div class="grid">
+    <div>
+      <h2>Build notes</h2>
+      <ul>
+        <li><b>Echo divider:</b> the JSN-SR04T drives Echo at 5 V. With 1 kΩ / 2 kΩ, GPIO32 sees about 3.3 V. Don't skip it, because the ESP32 inputs aren't 5 V tolerant.</li>
+        <li><b>Battery divider:</b> 100 kΩ + 100 kΩ halves a full 4.2 V Li-ion to 2.1 V, which matches <code>VBAT_DIVIDER_RATIO = 2.0</code>. The 100 nF cap steadies the reading from the high-impedance divider.</li>
+        <li><b>12 V battery instead?</b> Use R1 = 390 kΩ and R2 = 100 kΩ (ratio 4.9). Then 14.4 V charging reads about 2.9 V on the pin. Set the ratio in firmware to match.</li>
+        <li><b>DS18B20 colours:</b> red/yellow/black is the usual scheme, but some probes use white or blue for data. Check the probe's listing before soldering.</li>
+        <li><b>JSN-SR04T mode:</b> leave the board in its default trigger/echo mode (no mode resistor fitted). It can't measure closer than about 20–25 cm.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Parts for one node</h2>
+      <ul>
+        <li>Heltec WiFi LoRa 32 V2, 915 MHz version, with antenna</li>
+        <li>JSN-SR04T waterproof ultrasonic module</li>
+        <li>DS18B20 waterproof probe</li>
+        <li>SSD1306 0.96" I²C OLED (optional once deployed)</li>
+        <li>Resistors: 1 kΩ, 2 kΩ, 4.7 kΩ, 2 × 100 kΩ</li>
+        <li>100 nF ceramic capacitor</li>
+        <li>3.7 V Li-ion cell with JST-PH lead for the Heltec</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="warn">
+    <b>Heltec V2 pin clash:</b> on a genuine V2, GPIO4 is also the onboard OLED's SDA line and GPIO21 switches power to the external pins (Vext). If the DS18B20 reads 85 °C, reads −127 °C or drops out, move DQ to GPIO13 and change <code>PIN_DS18B20</code> to 13. Also, never transmit with the antenna disconnected, because it can damage the SX1276.
+  </div>
+</div>
+</body>
+</html>

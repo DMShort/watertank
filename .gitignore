@@ -1,0 +1,28 @@
+# Build outputs (releases are built by GitHub Actions)
+*.exe
+*.exe.old
+build/
+dist/
+tools/WatershedTankTool/src/tanktool_*
+
+# Tool runtime files
+tools/WatershedTankTool/logs/
+# may hold a GitHub token - never commit
+update.json
+
+# Old firmware copies
+*.bak
+
+# Base station runtime data and anything that may hold passwords
+basestation/mosquitto/data/
+basestation/mosquitto/log/
+basestation/homeassistant/
+*.log
+
+# Ebyte manual extract (their copyright) - keep local only
+basestation/e22_manual_extract.txt
+
+# Editor / OS clutter
+.vscode/
+Thumbs.db
+desktop.ini

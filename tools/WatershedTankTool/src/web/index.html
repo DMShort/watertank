@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watershed Tank Tool</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%226%22 y=%223%22 width=%2220%22 height=%2226%22 rx=%224%22 fill=%22%23dbe9fa%22 stroke=%22%2315202b%22 stroke-width=%222%22/%3E%3Crect x=%227%22 y=%2215%22 width=%2218%22 height=%2213%22 fill=%22%231f7ae0%22/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#eef1f4; --panel:#fff; --ink:#15202b; --muted:#5b6774; --line:#d7dde3;
+    --water:#1f7ae0; --water2:#5aa7f5; --ok:#178a4c; --warn:#b26b00; --fail:#c8322a;
+    --accent:#0b5cad; --chip:#f2f5f8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;background:#14212e;color:#fff;flex-wrap:wrap}
+  header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.01em}
+  header h1 small{font-weight:400;opacity:.6;margin-left:6px;font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;background:#24384b;font-size:13px}
+  .dot{width:10px;height:10px;border-radius:50%;background:#8a96a3}
+  .dot.on{background:#2fd17a;box-shadow:0 0 0 3px rgba(47,209,122,.25)}
+  .dot.busy{background:#f5b12a;animation:pulse 1s infinite}
+  .dot.bad{background:#ff5a4f}
+  @keyframes pulse{50%{opacity:.35}}
+  header .sp{flex:1}
+  header select{background:#24384b;color:#fff;border:1px solid #3a5269;border-radius:6px;padding:5px 8px;font:inherit;font-size:13px;max-width:330px}
+  button{font:inherit;font-size:13px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;cursor:pointer}
+  button:hover{border-color:#a9b4bf}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{background:#094f95}
+  button.danger{color:var(--fail)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  header button{background:#24384b;border-color:#3a5269;color:#fff}
+  header button:hover{border-color:#6f8aa3}
+  main{display:grid;grid-template-columns:minmax(380px,1.05fr) minmax(400px,1fr);gap:16px;padding:16px 18px 24px;max-width:1500px;margin:0 auto}
+  @media (max-width:980px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;font-weight:650}
+  .col{display:flex;flex-direction:column;gap:16px}
+  .banner{grid-column:1/-1;border-radius:10px;padding:10px 14px;font-size:14px;display:none}
+  .banner.show{display:block}
+  .banner.warn{background:#fff4e0;border:1px solid #f0c983;color:#6b4300}
+  .banner.info{background:#e8f2fd;border:1px solid #b5d3f5;color:#123e6b}
+  .banner.fail{background:#fdeceb;border:1px solid #f1b4ae;color:#7a1d17}
+
+  /* live */
+  .live{display:grid;grid-template-columns:200px 1fr;gap:18px;align-items:center}
+  .tankviz svg{width:100%;height:auto;display:block}
+  .bigs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .big{background:var(--chip);border-radius:10px;padding:10px 12px}
+  .big .k{font-size:12px;color:var(--muted)}
+  .big .v{font-size:26px;font-weight:700;letter-spacing:-.01em;line-height:1.15;font-variant-numeric:tabular-nums}
+  .big .v small{font-size:13px;font-weight:500;color:var(--muted);margin-left:3px}
+  .big.hero{grid-column:1/-1;background:#e6f0fc}
+  .big.hero .v{font-size:38px;color:#0d4d94}
+  .minis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+  .mini{border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+  .mini .k{font-size:11px;color:var(--muted)}
+  .mini .v{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums}
+  .age{font-size:12px;color:var(--muted);margin-top:8px}
+  .age.stale{color:var(--fail);font-weight:600}
+  canvas{width:100%;height:120px;display:block;margin-top:12px;border-top:1px solid var(--line)}
+  .chartlbl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:4px}
+
+  /* setup */
+  .shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .shape{border:2px solid var(--line);border-radius:10px;padding:8px 6px 6px;text-align:center;cursor:pointer;background:#fff}
+  .shape svg{width:64px;height:44px;display:block;margin:0 auto 4px}
+  .shape .t{font-size:12.5px;font-weight:600}
+  .shape.sel{border-color:var(--accent);background:#eef5fd}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+  label.f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted)}
+  label.f input{font:inherit;font-size:15px;color:var(--ink);padding:7px 9px;border:1px solid var(--line);border-radius:7px;width:100%}
+  label.f input:focus{outline:2px solid #8fbdf0;border-color:var(--accent)}
+  .row{display:flex;gap:8px;align-items:flex-end}
+  .row label.f{flex:1}
+  .hint{font-size:12px;color:var(--muted);margin:4px 0 0}
+  .sub{font-size:12.5px;font-weight:650;color:var(--ink);margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+  .cap{display:flex;justify-content:space-between;align-items:center;background:var(--chip);border-radius:8px;padding:8px 12px;margin-top:12px;font-size:13px}
+  .cap b{font-size:18px;font-variant-numeric:tabular-nums}
+  .capwarn{font-size:12.5px;margin-top:6px}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:12px}
+  .actions{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+  .msg{font-size:12.5px;color:var(--muted)}
+  .dirty{color:var(--warn);font-weight:600}
+
+  /* test */
+  .testgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .progress{height:10px;background:var(--chip);border-radius:6px;overflow:hidden;margin-top:12px}
+  .progress div{height:100%;background:var(--accent);width:0;transition:width .5s}
+  .verdicts{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .verdicts li{padding:7px 10px 7px 30px;border-radius:7px;position:relative;font-size:13px}
+  .verdicts li::before{position:absolute;left:10px;top:7px;font-weight:800}
+  .verdicts li.ok{background:#e9f6ef}.verdicts li.ok::before{content:"✓";color:var(--ok)}
+  .verdicts li.warn{background:#fff4e0}.verdicts li.warn::before{content:"!";color:var(--warn)}
+  .verdicts li.fail{background:#fdeceb}.verdicts li.fail::before{content:"✕";color:var(--fail)}
+  table.stats{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px;font-variant-numeric:tabular-nums}
+  table.stats th,table.stats td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
+  table.stats th:first-child,table.stats td:first-child{text-align:left}
+  table.stats th{color:var(--muted);font-weight:600}
+  .paths{font-size:12px;color:var(--muted);margin-top:8px;word-break:break-all}
+
+  /* firmware & updates */
+  .fwrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fwbox{background:var(--chip);border-radius:10px;padding:10px 12px}
+  .fwbox .k{font-size:12px;color:var(--muted)}
+  .fwbox .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .fwbox .v.old{color:var(--warn)}
+  .fwbox .v.cur{color:var(--ok)}
+  .notes{font-size:12.5px;background:#f7f9fb;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:10px;white-space:pre-wrap;max-height:120px;overflow:auto}
+  .fstage{font-size:13px;margin-top:10px;font-weight:600}
+  .ftail{font:11.5px/1.45 Consolas,ui-monospace,monospace;color:var(--muted);margin-top:6px;white-space:pre-wrap;max-height:110px;overflow:hidden}
+  .fbar{height:12px;background:var(--chip);border-radius:6px;overflow:hidden;margin-top:8px}
+  .fbar div{height:100%;background:var(--ok);width:0;transition:width .3s}
+  .fbar.fail div{background:var(--fail)}
+  details.adv{margin-top:12px;font-size:13px}
+  details.adv summary{cursor:pointer;color:var(--muted)}
+  .updline{font-size:12.5px;color:var(--muted);margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .overlay{position:fixed;inset:0;background:rgba(20,33,46,.75);color:#fff;display:none;align-items:center;justify-content:center;font-size:18px;z-index:10;text-align:center;padding:20px}
+  .overlay.show{display:flex}
+
+  /* console */
+  details.console{grid-column:1/-1}
+  details.console summary{cursor:pointer;font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650}
+  pre#log{background:#0f1720;color:#c9d6e2;border-radius:8px;padding:10px 12px;height:260px;overflow:auto;font:12px/1.5 Consolas,ui-monospace,monospace;margin:10px 0 8px;white-space:pre-wrap}
+  pre#log .sys{color:#7fb2e5}
+  pre#log .data{color:#6d7d8c}
+  pre#log .err{color:#ff8c84}
+  .conrow{display:flex;gap:8px;align-items:center}
+  .conrow input[type=text]{flex:1;font:13px Consolas,ui-monospace,monospace;padding:7px 9px;border:1px solid var(--line);border-radius:7px}
+  .toast{position:fixed;right:18px;bottom:18px;background:#14212e;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;max-width:420px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
+  .toast.show{opacity:1;transform:none}
+  .toast.bad{background:#8c201a}
+</style>
+</head>
+<body>
+<header>
+  <h1>Watershed Tank Tool <small id="appver"></small></h1>
+  <span class="pill"><span class="dot" id="cdot"></span><span id="ctext">Starting…</span></span>
+  <span class="sp"></span>
+  <select id="portsel" title="Serial ports"></select>
+  <button id="btnConnect">Connect</button>
+  <button id="btnAuto" title="Find the node automatically">Auto-detect</button>
+  <button id="btnDisc">Disconnect</button>
+  <button id="btnQuit" title="Close the tool">Quit</button>
+</header>
+
+<main>
+  <div class="banner" id="banner"></div>
+
+  <div class="col">
+    <section class="card">
+      <h2>Live reading</h2>
+      <div class="live">
+        <div class="tankviz" id="tankviz"></div>
+        <div class="bigs">
+          <div class="big hero"><div class="k">Volume</div><div class="v" id="vVol">—</div></div>
+          <div class="big"><div class="k">Level</div><div class="v" id="vPct">—</div></div>
+          <div class="big"><div class="k">Water height</div><div class="v" id="vH">—</div></div>
+        </div>
+      </div>
+      <div class="minis">
+        <div class="mini"><div class="k">Sensor → water</div><div class="v" id="vDist">—</div></div>
+        <div class="mini"><div class="k">Water temp</div><div class="v" id="vTemp">—</div></div>
+        <div class="mini"><div class="k">Supply / batt</div><div class="v" id="vSup">—</div></div>
+        <div class="mini"><div class="k">LoRa TX</div><div class="v" id="vTx">—</div></div>
+      </div>
+      <canvas id="chart" width="1000" height="240"></canvas>
+      <div class="chartlbl"><span id="chartL">Water height, last readings</span><span id="chartR"></span></div>
+      <div class="age" id="age">No readings yet.</div>
+    </section>
+
+    <section class="card">
+      <h2>Local test at the tank</h2>
+      <div class="testgrid">
+        <label class="f">Duration
+          <select id="tDur" style="font:inherit;font-size:15px;padding:7px 9px;border:1px solid var(--line);border-radius:7px">
+            <option value="60">1 minute</option>
+            <option value="120">2 minutes</option>
+            <option value="300" selected>5 minutes</option>
+            <option value="600">10 minutes</option>
+            <option value="1800">30 minutes</option>
+            <option value="3600">1 hour</option>
+          </select>
+        </label>
+        <label class="f">Label (optional)<input id="tLabel" placeholder="e.g. house tank"></label>
+        <label class="f">Dipstick depth, cm (optional)<input id="tRef" inputmode="decimal" placeholder="measured water depth"></label>
+      </div>
+      <p class="hint">Records every reading for the chosen time, then checks echo reliability, noise, temperature and supply. If you enter a dipstick depth, it also checks how far the node's water height is from your measurement. A CSV and a summary file are saved for each test.</p>
+      <div class="actions">
+        <button class="primary" id="tStart">Start test</button>
+        <button id="tStop" disabled>Stop &amp; analyse</button>
+        <button id="tLogs">Open logs folder</button>
+        <span class="msg" id="tMsg"></span>
+      </div>
+      <div class="progress"><div id="tBar"></div></div>
+      <div id="tResult"></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <h2>Tank setup</h2>
+      <div class="shapes" id="shapes">
+        <div class="shape" data-s="VERT">
+          <svg viewBox="0 0 64 44"><rect x="20" y="3" width="24" height="38" rx="3" fill="#dbe9fa" stroke="#15202b" stroke-width="2"/><rect x="21" y="22" width="22" height="18" fill="#5aa7f5"/></svg>
+          <div class="t">Round, upright</div>
+        </div>
+        <div class="shape" data-s="HORIZ">
+          <svg viewBox="0 0 64 44"><rect x="4" y="6" width="56" height="32" rx="16" fill="#dbe9fa" stroke="#15202b" stroke-width="2"/><path d="M6 26 H58 A15 15 0 0 1 46 37 H18 A15 15 0 0 1 6 26Z" fill="#5aa7f5"/></svg>
+          <div class="t">Round, on its side</div>
+        </div>
+        <div class="shape" data-s="RECT">
+          <svg viewBox="0 0 64 44"><rect x="6" y="8" width="52" height="30" rx="2" fill="#dbe9fa" stroke="#15202b" stroke-width="2"/><rect x="7" y="24" width="50" height="13" fill="#5aa7f5"/></svg>
+          <div class="t">Rectangular / slimline</div>
+        </div>
+      </div>
+      <div class="grid2">
+        <label class="f" id="fDiam">Inside diameter (cm)<input id="iDiam" inputmode="decimal"></label>
+        <label class="f" id="fLen">Inside length (cm)<input id="iLen" inputmode="decimal"></label>
+        <label class="f" id="fWidth">Inside width (cm)<input id="iWidth" inputmode="decimal"></label>
+        <label class="f">Node ID (1–255)<input id="iNode" inputmode="numeric"></label>
+      </div>
+
+      <div class="sub">Calibration: distances from the sensor face</div>
+      <div class="row">
+        <label class="f">Empty: sensor to tank floor (cm)<input id="iEmpty" inputmode="decimal"></label>
+        <button id="capEmpty" title="Only if the tank is empty right now">Capture now</button>
+      </div>
+      <p class="hint">Measure with a tape from the sensor face down to the floor (or to the outlet, if you only want usable water). Use "Capture now" only if the tank really is empty.</p>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Full: sensor to overflow level (cm)<input id="iFull" inputmode="decimal"></label>
+        <button id="capFull" title="Only if the water is at overflow right now">Capture now</button>
+      </div>
+      <p class="hint">Distance from the sensor face to the overflow outlet's water line. Keep it at least 25 cm, or a full tank may read as no echo.</p>
+
+      <div class="cap"><span>Capacity from these numbers</span><b id="capCalc">—</b></div>
+      <div class="row" style="margin-top:8px">
+        <label class="f">Rated capacity on the tank label (L, optional, for checking)<input id="iRated" inputmode="numeric"></label>
+      </div>
+      <div class="capwarn" id="capWarn"></div>
+
+      <label class="toggle"><input type="checkbox" id="iTx"> LoRa transmit on <span class="msg">(turn off for at-tank tests while there's no base station)</span></label>
+
+      <div class="actions">
+        <button class="primary" id="btnApply">Save to node</button>
+        <button id="btnReload">Reload from node</button>
+        <span class="msg" id="setMsg"></span>
+      </div>
+    </section>
+
+    <section class="card" id="fwcard">
+      <h2>Firmware &amp; updates</h2>
+      <div class="fwrow">
+        <div class="fwbox"><div class="k">On the node</div><div class="v" id="fwNode">—</div></div>
+        <div class="fwbox"><div class="k">Latest release</div><div class="v" id="fwLatest">—</div></div>
+      </div>
+      <div class="notes" id="fwNotes" style="display:none"></div>
+      <div class="actions">
+        <button class="primary" id="fwInstall" disabled>Install firmware</button>
+        <span class="msg" id="fwMsg">Tank settings and calibration are kept.</span>
+      </div>
+      <div id="fwProg" style="display:none">
+        <div class="fstage" id="fwStage"></div>
+        <div class="fbar" id="fwBarWrap"><div id="fwBar"></div></div>
+        <div class="ftail" id="fwTail"></div>
+      </div>
+      <details class="adv">
+        <summary>Flash a test build (.bin file from Dave)</summary>
+        <p class="hint">In the Arduino IDE: Sketch → Export Compiled Binary, then send the <b>tank_node.ino.bin</b> file (not the bootloader, partitions or merged file). Only the app is replaced, so settings are kept.</p>
+        <div class="actions"><input type="file" id="fwFile" accept=".bin"><button id="fwFlashFile" disabled>Flash this file</button></div>
+      </details>
+      <div class="updline"><span id="updText">Checking for updates…</span><button id="updCheck">Check now</button><button class="primary" id="updTool" style="display:none">Update tool</button></div>
+    </section>
+  </div>
+
+  <details class="console card" id="console">
+    <summary>Serial console</summary>
+    <pre id="log"></pre>
+    <div class="conrow">
+      <input type="text" id="cmd" placeholder="Type a command, e.g. HELP or CAL SHOW, then Enter">
+      <button id="cmdSend">Send</button>
+      <label class="toggle" style="margin:0"><input type="checkbox" id="hideData" checked> Hide data lines</label>
+    </div>
+  </details>
+</main>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay">Updating the Watershed Tank Tool…<br>This window will reload by itself in a few seconds.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let update = {}, flash = null, loadedVersion = null;
+let status = {}, cfg = null, last = null, lastAt = 0, history = [], shape = "VERT", dirty = false, testRunning = false;
+
+function toast(msg, bad){
+  const t = $("toast"); t.textContent = msg; t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.className = "toast", bad ? 6000 : 2600);
+}
+async function api(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json","X-Watershed":"1"}, body: JSON.stringify(body || {})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+const fmt = (v, d) => (v === null || v === undefined || isNaN(v)) ? "—" : Number(v).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+
+// ---------- geometry (same maths as the firmware) ----------
+function volumeAt(c, h){
+  if (!(h > 0)) return 0;
+  if (c.shape === "HORIZ"){
+    const r = c.diam / 2; h = Math.min(h, c.diam);
+    const a = r*r*Math.acos((r-h)/r) - (r-h)*Math.sqrt(2*r*h - h*h);
+    return a * c.len / 1000;
+  }
+  if (c.shape === "RECT") return c.len * c.width * h / 1000;
+  const r = c.diam / 2; return Math.PI * r * r * h / 1000;
+}
+function formGeom(){
+  return {shape, diam:num("iDiam")||0, len:num("iLen")||0, width:num("iWidth")||0, empty:num("iEmpty"), full:num("iFull")};
+}
+
+// ---------- status / header ----------
+function renderStatus(){
+  $("appver").textContent = status.app_version ? "v" + status.app_version : "";
+  const dot = $("cdot"), txt = $("ctext"), b = $("banner");
+  let bannerCls = "", bannerHtml = "";
+  if (status.connected && status.ident){
+    dot.className = "dot on";
+    txt.textContent = `${status.port} · node ${status.ident.node_id} · firmware v${status.ident.ver}`;
+    if (verLess(status.ident.ver, status.min_fw)){ bannerCls="warn"; bannerHtml = `This node runs firmware v${status.ident.ver}. Flash <b>tank_node.ino v${status.min_fw}</b> or newer for tank shapes and volume.`; }
+  } else if (status.connected && status.probing){
+    dot.className = "dot busy"; txt.textContent = `Talking to ${status.port}…`;
+  } else if (status.connected && status.legacy){
+    dot.className = "dot bad"; txt.textContent = `${status.port} · old firmware`;
+    bannerCls = "warn"; bannerHtml = `Found a Watershed node on <b>${status.port}</b>, but it's running the old v0.2 firmware, which has no tank shapes, volume or tool support. Click <b>Install firmware</b> in the Firmware &amp; updates box to update it. No Arduino IDE needed.`;
+  } else if (status.connected){
+    dot.className = "dot bad"; txt.textContent = `${status.port} · not a Watershed node`;
+    bannerCls = "info"; bannerHtml = `<b>${status.port}</b> is open, but nothing answered as a Watershed node. Check it's the right port, and that the board is running tank_node.ino v${status.min_fw}.`;
+  } else if (status.auto){
+    dot.className = "dot busy"; txt.textContent = "Waiting for a node… plug it in by USB";
+    bannerCls = "info"; bannerHtml = `Plug the tank node into this laptop by USB and it will be found automatically. If nothing happens after 10 seconds: check the cable carries data (some are charge-only), close the Arduino IDE Serial Monitor, and check Device Manager shows a <b>Silicon Labs CP210x</b> COM port. If it doesn't, install the CP210x driver from silabs.com.`;
+  } else {
+    dot.className = "dot"; txt.textContent = "Disconnected";
+  }
+  b.className = "banner" + (bannerCls ? " show " + bannerCls : ""); b.innerHTML = bannerHtml;
+  $("btnDisc").disabled = !status.connected;
+  const ready = status.connected && status.ident;
+  for (const id of ["btnApply","btnReload","capEmpty","capFull","cmdSend"]) $(id).disabled = !status.connected || (id !== "cmdSend" && !ready);
+  $("tStart").disabled = !ready || testRunning;
+  renderFw();
+}
+
+// ---------- firmware & updates ----------
+function renderFw(){
+  const nodeVer = status.ident ? status.ident.ver : (status.legacy ? "0.2 (old)" : null);
+  const lat = update.latest;
+  const fwL = lat ? lat.fw_version : null;
+  const older = lat && status.connected && (status.legacy || (status.ident && verLess(status.ident.ver, fwL)));
+  $("fwNode").textContent = nodeVer ? "v" + nodeVer : (status.connected ? "unknown" : "not connected");
+  $("fwNode").className = "v" + (older ? " old" : (nodeVer && lat && !older ? " cur" : ""));
+  $("fwLatest").textContent = fwL ? "v" + fwL : (update.enabled === false ? "updates off" : "—");
+  const n = $("fwNotes");
+  if (lat && lat.notes){ n.style.display = ""; n.textContent = `${lat.tag}${lat.published ? " · " + lat.published.slice(0,10) : ""}\n${lat.notes}`; } else n.style.display = "none";
+  const flashing = flash && flash.running;
+  const port = status.port || $("portsel").value;
+  const inst = $("fwInstall");
+  inst.disabled = !lat || flashing || testRunning || !port || status.probing;
+  inst.textContent = !lat ? "Install firmware" : older ? `Install firmware v${fwL}` : (status.connected && nodeVer ? `Reinstall v${fwL}` : `Install firmware v${fwL}`);
+  inst.className = (older || !status.ident) ? "primary" : "";
+  $("fwFlashFile").disabled = flashing || testRunning || !port || !$("fwFile").files.length;
+  if (!lat) $("fwMsg").textContent = update.enabled === false ? "This copy of the tool has no update source." : "Tank settings and calibration are kept.";
+  else if (older) $("fwMsg").innerHTML = `<b style="color:var(--warn)">Update available.</b> Tank settings and calibration are kept.`;
+  else $("fwMsg").textContent = "Tank settings and calibration are kept.";
+  // tool updates
+  const t = $("updText"), b = $("updTool");
+  if (update.enabled === false){ t.textContent = `Tool ${status.app_version || ""} (development build, no automatic updates)`; b.style.display = "none"; return; }
+  if (update.busy) t.textContent = update.busy;
+  else if (update.error) t.innerHTML = `<span style="color:var(--fail)">Update check failed:</span> ${esc(update.error)}`;
+  else if (update.tool_update) t.innerHTML = `<b>Tool v${esc(lat.tool_version)} is available</b> (you have v${esc(update.tool_version)}).`;
+  else if (lat) t.textContent = `Tool v${update.tool_version}, up to date${update.checked ? " (checked " + update.checked + ")" : ""}.`;
+  else t.textContent = "Checking for updates…";
+  b.style.display = update.tool_update && !update.busy ? "" : "none";
+  if (flash && flash.done && flash.ok && status.ident) $("fwStage").textContent = `Installed ✓. The node is running v${status.ident.ver}.`;
+}
+function renderFlash(){
+  const f = flash; if (!f) return;
+  $("fwProg").style.display = "";
+  $("fwStage").textContent = (f.target ? f.target + ": " : "") + (f.stage || "");
+  $("fwBar").style.width = (f.pct || 0) + "%";
+  $("fwBarWrap").className = "fbar" + (f.done && !f.ok ? " fail" : "");
+  let tail = (f.tail || []).slice(-5).join("\n");
+  if (f.error) tail = "Error: " + f.error + (f.hint ? "\n\n" + f.hint : "") + "\n\n" + tail;
+  $("fwTail").textContent = tail;
+  $("fwTail").style.color = f.done && !f.ok ? "var(--fail)" : "";
+  renderFw();
+}
+function verLess(a, b){
+  const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++){ const x = pa[i]||0, y = pb[i]||0; if (x !== y) return x < y; }
+  return false;
+}
+async function loadPorts(){
+  try{
+    const ports = await (await fetch("/api/ports")).json();
+    const sel = $("portsel"), prev = sel.value || status.port;
+    sel.innerHTML = "";
+    if (!ports || !ports.length){ sel.innerHTML = "<option value=''>No serial ports found</option>"; return; }
+    for (const p of ports){
+      const o = document.createElement("option"); o.value = p.name;
+      o.textContent = `${p.name} — ${p.desc}${p.likely ? "  ★" : ""}`;
+      sel.appendChild(o);
+    }
+    if (prev && ports.some(p => p.name === prev)) sel.value = prev;
+  }catch(e){}
+}
+
+// ---------- config form ----------
+function setShape(s){
+  shape = s;
+  document.querySelectorAll(".shape").forEach(el => el.classList.toggle("sel", el.dataset.s === s));
+  $("fDiam").style.display  = (s === "VERT" || s === "HORIZ") ? "" : "none";
+  $("fLen").style.display   = (s === "HORIZ" || s === "RECT") ? "" : "none";
+  $("fWidth").style.display = (s === "RECT") ? "" : "none";
+  updateCap(); drawTank();
+}
+function fillForm(c){
+  if (!c) return;
+  setShape(c.shape || "VERT");
+  $("iDiam").value = c.diam_cm; $("iLen").value = c.len_cm; $("iWidth").value = c.width_cm;
+  $("iNode").value = c.node_id; $("iEmpty").value = c.empty_cm; $("iFull").value = c.full_cm;
+  $("iTx").checked = !!c.tx_on;
+  dirty = false; $("setMsg").textContent = ""; $("setMsg").className = "msg";
+  updateCap();
+}
+function markDirty(){ dirty = true; $("setMsg").textContent = "Unsaved changes"; $("setMsg").className = "msg dirty"; updateCap(); drawTank(); }
+function updateCap(){
+  const g = formGeom(), w = $("capWarn");
+  let msgs = [];
+  if (g.empty == null || g.full == null){ $("capCalc").textContent = "—"; w.textContent = ""; return; }
+  const hMax = g.empty - g.full;
+  if (hMax <= 0){ $("capCalc").textContent = "—"; w.innerHTML = `<span style="color:var(--fail)">Empty distance must be bigger than full distance.</span>`; return; }
+  const cap = volumeAt(g, hMax);
+  $("capCalc").textContent = fmt(cap, 0) + " L";
+  if (g.shape === "HORIZ" && hMax > g.diam + 1) msgs.push(`<span style="color:var(--warn)">Empty − full (${fmt(hMax,1)} cm) is more than the diameter (${fmt(g.diam,1)} cm). For a tank on its side, these are usually about equal.</span>`);
+  if (g.full < 22) msgs.push(`<span style="color:var(--warn)">The full point is ${fmt(g.full,0)} cm from the sensor. The JSN-SR04T needs about 25 cm, so raise the sensor on a riser.</span>`);
+  const rated = num("iRated");
+  if (rated){
+    const diff = (cap - rated) / rated * 100;
+    const col = Math.abs(diff) <= 5 ? "var(--ok)" : Math.abs(diff) <= 12 ? "var(--warn)" : "var(--fail)";
+    msgs.push(`<span style="color:${col}">${diff >= 0 ? "+" : ""}${fmt(diff,1)}% vs rated ${fmt(rated,0)} L.</span> ` +
+      (Math.abs(diff) > 5 ? "Check the diameter is the <i>inside</i> measurement, and the empty/full points." : "Looks right."));
+  }
+  w.innerHTML = msgs.join("<br>");
+}
+
+// ---------- live ----------
+function drawTank(){
+  const g = cfg ? {shape: cfg.shape, diam: cfg.diam_cm, len: cfg.len_cm, width: cfg.width_cm, empty: cfg.empty_cm, full: cfg.full_cm} : formGeom();
+  const s = cfg ? cfg.shape : shape;
+  const h = last && last.height_cm != null ? last.height_cm : null;
+  const hMax = (g.empty != null && g.full != null) ? g.empty - g.full : 0;
+  let html = "";
+  const wave = "#1f7ae0", glass = "#e9f1fb", edge = "#15202b";
+  if (s === "HORIZ"){
+    const frac = (h != null && g.diam > 0) ? Math.min(1, h / g.diam) : 0;
+    const y = 180 - 160 * frac;
+    html = `<svg viewBox="0 0 200 200"><defs><clipPath id="cc"><circle cx="100" cy="100" r="80"/></clipPath></defs>
+      <circle cx="100" cy="100" r="80" fill="${glass}"/>
+      <rect x="0" y="${y}" width="200" height="${200-y}" fill="${wave}" clip-path="url(#cc)" opacity="${h==null?0:1}"/>
+      <circle cx="100" cy="100" r="80" fill="none" stroke="${edge}" stroke-width="3"/>
+      <text x="100" y="196" text-anchor="middle" font-size="11" fill="#5b6774">end view</text></svg>`;
+  } else {
+    const box = s === "RECT" ? {x:20,y:50,w:160,h:120} : {x:45,y:15,w:110,h:165};
+    const frac = (h != null && hMax > 0) ? Math.min(1, h / hMax) : 0;
+    const fh = box.h * frac;
+    html = `<svg viewBox="0 0 200 200">
+      <rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="${s==='RECT'?3:10}" fill="${glass}"/>
+      <rect x="${box.x}" y="${box.y+box.h-fh}" width="${box.w}" height="${fh}" fill="${wave}" opacity="${h==null?0:1}"/>
+      <rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="${s==='RECT'?3:10}" fill="none" stroke="${edge}" stroke-width="3"/>
+      <line x1="${box.x-8}" y1="${box.y}" x2="${box.x+box.w+8}" y2="${box.y}" stroke="#c8322a" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="${box.x+box.w}" y="${box.y-4}" text-anchor="end" font-size="10" fill="#c8322a">full</text></svg>`;
+  }
+  $("tankviz").innerHTML = html;
+}
+function renderReading(){
+  const r = last;
+  if (!r){ return; }
+  const cap = r.capacity_l;
+  $("vVol").innerHTML = r.volume_l == null ? `<span style="color:var(--fail);font-size:24px">no echo</span>` : `${fmt(r.volume_l,0)}<small>L of ${fmt(cap,0)}</small>`;
+  $("vPct").innerHTML = r.level_pct == null ? "—" : `${fmt(r.level_pct,1)}<small>%</small>`;
+  $("vH").innerHTML   = r.height_cm == null ? "—" : `${fmt(r.height_cm,1)}<small>cm</small>`;
+  $("vDist").textContent = r.distance_cm == null ? "no echo" : fmt(r.distance_cm,1) + " cm";
+  $("vTemp").textContent = r.temp_c == null ? "no sensor" : fmt(r.temp_c,1) + " °C";
+  $("vSup").textContent = r.batt_mv == null ? "—" : fmt(r.batt_mv/1000,2) + " V";
+  $("vTx").textContent = {OK:"sent", OFF:"off", ERR:"error", NO_RADIO:"no radio"}[r.tx] || r.tx || "—";
+  drawTank(); drawChart();
+}
+function drawChart(){
+  const c = $("chart"), ctx = c.getContext("2d"), W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+  const pts = history.filter(p => p.h != null);
+  if (pts.length < 2){ $("chartR").textContent = ""; return; }
+  let lo = Math.min(...pts.map(p=>p.h)), hi = Math.max(...pts.map(p=>p.h));
+  const pad = Math.max(1, (hi - lo) * 0.25); lo -= pad; hi += pad;
+  const t0 = history[0].t, t1 = history[history.length-1].t, span = Math.max(1, t1 - t0);
+  ctx.strokeStyle = "#e3e8ee"; ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++){ const y = H*i/4; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  ctx.strokeStyle = "#1f7ae0"; ctx.lineWidth = 3; ctx.beginPath();
+  pts.forEach((p,i) => { const x = (p.t - t0)/span*(W-10)+5, y = H - (p.h - lo)/(hi - lo)*(H-20) - 10; i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
+  ctx.stroke();
+  // missed echoes as red ticks
+  ctx.fillStyle = "#c8322a";
+  history.filter(p => p.h == null).forEach(p => { const x = (p.t - t0)/span*(W-10)+5; ctx.fillRect(x-1.5, H-14, 3, 14); });
+  $("chartR").textContent = `${fmt(lo+pad,1)} – ${fmt(hi-pad,1)} cm · ${Math.round(span/1000)} s`;
+}
+setInterval(() => {
+  if (!lastAt){ return; }
+  const s = Math.round((Date.now() - lastAt)/1000), el = $("age");
+  el.textContent = s <= 1 ? "Updated just now" : `Last reading ${s} s ago`;
+  el.className = "age" + (s > 8 && status.connected ? " stale" : "");
+  if (s > 8 && status.connected) el.textContent += ". The node has stopped reporting.";
+}, 1000);
+
+// ---------- test ----------
+function renderTest(t){
+  if (!t) return;
+  testRunning = !!t.running;
+  $("tStop").disabled = !testRunning; $("tStart").disabled = testRunning || !(status.connected && status.ident);
+  if (t.running){
+    $("tBar").style.width = Math.min(100, t.elapsed / t.total * 100) + "%";
+    const rem = Math.max(0, t.total - t.elapsed);
+    $("tMsg").textContent = `Recording… ${t.samples} readings, ${Math.floor(rem/60)}:${String(rem%60).padStart(2,"0")} left`;
+    return;
+  }
+  const r = t.result; if (!r) return;
+  $("tBar").style.width = "100%"; $("tMsg").textContent = `Finished: ${r.samples} readings over ${r.seconds} s`;
+  const row = (n, s, u, d) => s ? `<tr><td>${n}</td><td>${fmt(s.mean,d)} ${u}</td><td>${fmt(s.sd,2)}</td><td>${fmt(s.min,d)}</td><td>${fmt(s.max,d)}</td></tr>` : `<tr><td>${n}</td><td colspan=4 style="text-align:center;color:var(--muted)">no data</td></tr>`;
+  $("tResult").innerHTML =
+    `<ul class="verdicts">${r.verdicts.map(v => `<li class="${v.level}">${esc(v.text)}</li>`).join("")}</ul>
+     <table class="stats"><tr><th></th><th>Mean</th><th>SD</th><th>Min</th><th>Max</th></tr>
+     ${row("Distance", r.distance_cm, "cm", 1)}${row("Water height", r.height_cm, "cm", 1)}${row("Level", r.level_pct, "%", 1)}
+     ${row("Volume", r.volume_l, "L", 0)}${row("Temperature", r.temp_c, "°C", 1)}${row("Supply", r.batt_mv, "mV", 0)}</table>
+     <div class="paths">${r.csv_path ? "Saved: " + esc(r.csv_path) + "<br>" + esc(r.report_path || "") : "Couldn't save the log files."}</div>`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------- console ----------
+function addLine(l){
+  const log = $("log"), isData = l.startsWith("@R ") || /^distance_cm=/.test(l);
+  const span = document.createElement("div");
+  span.textContent = l;
+  if (l.startsWith("# ") || l.startsWith("# >")) span.className = "sys";
+  else if (l.startsWith("@ERR")) span.className = "err";
+  else if (isData) span.className = "data";
+  span.dataset.data = isData ? "1" : "";
+  if (isData && $("hideData").checked) span.style.display = "none";
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  log.appendChild(span);
+  while (log.childNodes.length > 800) log.removeChild(log.firstChild);
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+$("hideData").onchange = () => { document.querySelectorAll("#log div").forEach(d => { if (d.dataset.data) d.style.display = $("hideData").checked ? "none" : ""; }); };
+
+// ---------- events ----------
+function connectEvents(){
+  const es = new EventSource("/events");
+  es.addEventListener("snapshot", e => {
+    const s = JSON.parse(e.data);
+    const v = (s.status || {}).app_version;
+    if (loadedVersion && v && v !== loadedVersion){ location.reload(); return; }
+    loadedVersion = v; $("overlay").className = "overlay";
+    update = s.update || {}; if (s.flash){ flash = s.flash; renderFlash(); }
+    status = s.status || {}; renderStatus();
+    if (s.cfg){ cfg = s.cfg; fillForm(cfg); }
+    if (s.last){ last = s.last; lastAt = Date.now(); renderReading(); }
+    $("log").innerHTML = ""; (s.lines || []).forEach(addLine);
+    if (s.test) renderTest(s.test);
+    loadPorts();
+  });
+  es.addEventListener("status", e => {
+    const was = status.connected && status.ident;
+    status = JSON.parse(e.data); renderStatus(); loadPorts();
+    const now = status.connected && status.ident;
+    if (now && !was){ toast(`Connected to node ${status.ident.node_id} on ${status.port}`); history = []; }
+    if (!status.connected && was){ toast("Node disconnected", true); }
+  });
+  es.addEventListener("cleared", () => {
+    last = null; cfg = null; lastAt = 0; history = [];
+    ["vVol","vPct","vH","vDist","vTemp","vSup","vTx"].forEach(id => $(id).textContent = "—");
+    $("age").textContent = "No readings yet."; $("age").className = "age"; drawTank(); drawChart();
+  });
+  es.addEventListener("cfg", e => { cfg = JSON.parse(e.data); if (!dirty) fillForm(cfg); drawTank(); });
+  es.addEventListener("reading", e => {
+    last = JSON.parse(e.data); lastAt = Date.now();
+    history.push({t: Date.now(), h: last.height_cm});
+    if (history.length > 300) history.shift();
+    renderReading();
+  });
+  es.addEventListener("line", e => addLine(JSON.parse(e.data)));
+  es.addEventListener("nodeerror", e => toast("Node: " + JSON.parse(e.data), true));
+  es.addEventListener("test", e => { renderTest(JSON.parse(e.data)); renderFw(); });
+  es.addEventListener("update", e => { update = JSON.parse(e.data); renderFw(); });
+  es.addEventListener("flash", e => {
+    const was = flash && flash.running; flash = JSON.parse(e.data); renderFlash();
+    if (was && flash.done) toast(flash.ok ? "Firmware installed. Reconnecting…" : "Flashing failed. See the Firmware box", !flash.ok);
+  });
+  es.addEventListener("restarting", () => { $("overlay").className = "overlay show"; });
+  es.onerror = () => { if ($("overlay").className.includes("show")) return; $("cdot").className = "dot bad"; $("ctext").textContent = "Tool not running. Close this window and start it again."; };
+}
+
+// ---------- wiring ----------
+document.querySelectorAll(".shape").forEach(el => el.onclick = () => { setShape(el.dataset.s); markDirty(); });
+["iDiam","iLen","iWidth","iNode","iEmpty","iFull","iTx"].forEach(id => $(id).addEventListener("input", markDirty));
+$("iRated").addEventListener("input", updateCap);
+$("btnApply").onclick = async () => {
+  const body = {shape, node_id: num("iNode"), empty_cm: num("iEmpty"), full_cm: num("iFull"), tx_on: $("iTx").checked};
+  if (shape !== "RECT") body.diam_cm = num("iDiam");
+  if (shape !== "VERT") body.len_cm = num("iLen");
+  if (shape === "RECT") body.width_cm = num("iWidth");
+  for (const k in body) if (body[k] === null){ toast("Fill in all the fields shown first", true); return; }
+  if (body.empty_cm <= body.full_cm){ toast("Empty distance must be bigger than full distance", true); return; }
+  try{ $("btnApply").disabled = true; await api("/api/config", body); dirty = false; $("setMsg").textContent = "Saved to node ✓"; $("setMsg").className = "msg"; toast("Settings saved to the node"); }
+  catch(e){ toast(e.message, true); }
+  finally{ $("btnApply").disabled = false; }
+};
+$("btnReload").onclick = async () => { dirty = false; try{ await api("/api/cmd", {cmd:"CAL SHOW"}); }catch(e){ toast(e.message, true); } };
+$("capEmpty").onclick = async () => { if (!confirmBox("Capture EMPTY now? Only do this if the tank is empty (water at the floor or outlet).")) return; dirty = false; try{ await api("/api/cmd", {cmd:"CAL EMPTY"}); }catch(e){ toast(e.message, true); } };
+$("capFull").onclick  = async () => { if (!confirmBox("Capture FULL now? Only do this if the water is at the overflow level.")) return; dirty = false; try{ await api("/api/cmd", {cmd:"CAL FULL"}); }catch(e){ toast(e.message, true); } };
+function confirmBox(msg){ return window.confirm(msg); }
+$("btnConnect").onclick = async () => { const p = $("portsel").value; if (!p) return; try{ const r = await api("/api/connect", {port:p}); if (!r.identified && !status.legacy) toast(`${p} opened but no Watershed node answered`, true); }catch(e){ toast(e.message, true); } };
+$("btnAuto").onclick = async () => { try{ await api("/api/autodetect"); toast("Looking for the node…"); }catch(e){ toast(e.message, true); } };
+$("btnDisc").onclick = async () => { try{ await api("/api/disconnect"); }catch(e){ toast(e.message, true); } };
+$("btnQuit").onclick = async () => { try{ await api("/api/quit"); }catch(e){} document.body.innerHTML = "<p style='padding:30px;font-size:16px'>Watershed Tank Tool has closed. You can close this window.</p>"; window.close(); };
+$("tStart").onclick = async () => {
+  const ref = $("tRef").value.trim() === "" ? undefined : num("tRef");
+  if ($("tRef").value.trim() !== "" && ref == null){ toast("Dipstick depth must be a number", true); return; }
+  try{ $("tResult").innerHTML = ""; await api("/api/test/start", {seconds: +$("tDur").value, label: $("tLabel").value, ref_height_cm: ref}); testRunning = true; renderStatus(); $("tStop").disabled = false; }
+  catch(e){ toast(e.message, true); }
+};
+$("tStop").onclick = async () => { try{ await api("/api/test/stop"); }catch(e){ toast(e.message, true); } };
+$("tLogs").onclick = async () => { try{ await api("/api/openlogs"); }catch(e){ toast(e.message, true); } };
+async function sendCmd(){ const c = $("cmd").value.trim(); if (!c) return; try{ await api("/api/cmd", {cmd:c}); $("cmd").value = ""; }catch(e){ toast(e.message, true); } }
+$("cmdSend").onclick = sendCmd;
+$("cmd").addEventListener("keydown", e => { if (e.key === "Enter") sendCmd(); });
+
+$("fwInstall").onclick = async () => {
+  const lat = update.latest; if (!lat) return;
+  const port = status.port || $("portsel").value;
+  let force = false;
+  if (status.ident && lat.fw_board && status.ident.board && status.ident.board !== lat.fw_board){
+    if (!confirm(`This node reports board "${status.ident.board}" but the firmware is for "${lat.fw_board}". Flash anyway?`)) return; force = true;
+  }
+  if (!status.ident && !confirm(`Install firmware v${lat.fw_version} on ${port}? Keep the USB cable connected until it says Done.`)) return;
+  try{ flash = {running:true, stage:"Starting…", pct:0, tail:[]}; renderFlash(); await api("/api/flash/release", {port, force}); }
+  catch(e){ flash = null; $("fwProg").style.display = "none"; renderFw(); toast(e.message, true); }
+};
+$("fwFile").onchange = renderFw;
+$("fwFlashFile").onclick = async () => {
+  const f = $("fwFile").files[0]; if (!f) return;
+  const port = status.port || $("portsel").value;
+  if (!confirm(`Flash ${f.name} (${Math.round(f.size/1024)} KB) to the node on ${port}?`)) return;
+  try{
+    flash = {running:true, stage:"Starting…", pct:0, tail:[]}; renderFlash();
+    const r = await fetch("/api/flash/upload?port=" + encodeURIComponent(port), {method:"POST", headers:{"X-Watershed":"1","X-Filename":f.name,"Content-Type":"application/octet-stream"}, body: f});
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
+  }catch(e){ flash = null; $("fwProg").style.display = "none"; renderFw(); toast(e.message, true); }
+};
+$("updCheck").onclick = async () => { try{ update.busy = "Checking…"; renderFw(); await api("/api/update/check"); }catch(e){ toast(e.message, true); } };
+$("updTool").onclick = async () => { try{ await api("/api/update/tool"); }catch(e){ toast(e.message, true); } };
+$("portsel").addEventListener("change", renderFw);
+
+setShape("VERT"); drawTank(); connectEvents(); setInterval(loadPorts, 5000);
+</script>
+</body>
+</html>
