@@ -324,14 +324,16 @@ func ensureShortcuts(a *App) {
 	}
 	dir := filepath.Join(base, "WatershedTankTool")
 	flag := filepath.Join(dir, "shortcuts.txt")
-	if b, err := os.ReadFile(flag); err == nil && strings.TrimSpace(string(b)) == exe {
+	ico := iconFile()
+	marker := "v2|" + exe // bump when the shortcut itself changes (v2: icon)
+	if b, err := os.ReadFile(flag); err == nil && strings.TrimSpace(string(b)) == marker {
 		return // already done for this location (deleted ones stay deleted)
 	}
 	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 	script := `$ErrorActionPreference='Stop'; $w=New-Object -ComObject WScript.Shell; ` +
 		`foreach($d in @([Environment]::GetFolderPath('Desktop'),[Environment]::GetFolderPath('Programs'))){ ` +
 		`$s=$w.CreateShortcut((Join-Path $d 'Watershed Tank Tool.lnk')); $s.TargetPath=` + q(exe) + `; ` +
-		`$s.WorkingDirectory=` + q(filepath.Dir(exe)) + `; $s.Description='Set up, test and update the Watershed tank node'; $s.Save() }`
+		`$s.WorkingDirectory=` + q(filepath.Dir(exe)) + `; $s.IconLocation=` + q(ico+",0") + `; $s.Description='Set up, test and update the Watershed tank node'; $s.Save() }`
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
 	hideWindow(cmd)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -339,7 +341,7 @@ func ensureShortcuts(a *App) {
 		return
 	}
 	os.MkdirAll(dir, 0o755)
-	os.WriteFile(flag, []byte(exe), 0o644)
+	os.WriteFile(flag, []byte(marker), 0o644)
 	a.sysLine("created Desktop and Start Menu shortcuts to %s", exe)
 }
 

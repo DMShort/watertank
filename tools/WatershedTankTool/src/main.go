@@ -373,6 +373,9 @@ type App struct {
 	flash     *FlashJob
 	srv       *http.Server
 	slog      *SessionLog
+	// brings the tool's own window to the front (nil in browser mode)
+	showWindow func()
+	url        string
 }
 
 func (a *App) status() map[string]any {
@@ -1087,6 +1090,17 @@ func (a *App) routes() *http.ServeMux {
 	post("/api/support/diagnostics", func(w http.ResponseWriter, b map[string]any) {
 		jsonOut(w, map[string]any{"text": a.diagnostics()})
 	})
+	post("/api/show", func(w http.ResponseWriter, b map[string]any) {
+		a.mu.Lock()
+		show, url := a.showWindow, a.url
+		a.mu.Unlock()
+		if show != nil {
+			show()
+		} else {
+			openWindow(url)
+		}
+		jsonOut(w, map[string]any{"ok": true})
+	})
 	post("/api/quit", func(w http.ResponseWriter, b map[string]any) {
 		jsonOut(w, map[string]any{"ok": true})
 		go func() { time.Sleep(300 * time.Millisecond); a.disconnect(); a.slog.Close(); os.Exit(0) }()
@@ -1126,8 +1140,12 @@ func main() {
 			json.NewDecoder(resp.Body).Decode(&p)
 			resp.Body.Close()
 			if p["app"] == "watershed-tank-tool" {
-				fmt.Println("Already running - opening its window.")
-				openWindow(fmt.Sprintf("http://127.0.0.1:%d/", defaultPort))
+				// ask the running copy to show itself
+				req, _ := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%d/api/show", defaultPort), strings.NewReader("{}"))
+				req.Header.Set("X-Watershed", "1")
+				if r, err := http.DefaultClient.Do(req); err == nil {
+					r.Body.Close()
+				}
 				return
 			}
 		}
@@ -1171,24 +1189,33 @@ func main() {
 	if app.upd.enabled() { // release builds only, not Dave's dev builds
 		go ensureShortcuts(app)
 	}
-	if os.Getenv("WATERSHED_NO_WINDOW") == "" {
-		go func() {
-			if updated {
-				// the existing window reconnects by itself; only open one if it doesn't
-				time.Sleep(8 * time.Second)
-				app.hub.mu.Lock()
-				had := app.hub.everClient
-				app.hub.mu.Unlock()
-				if had {
-					return
-				}
-			} else {
-				time.Sleep(300 * time.Millisecond)
-			}
-			openWindow(url)
-		}()
-	}
+	app.url = url
 	app.srv = &http.Server{Handler: app.routes(), ReadHeaderTimeout: 10 * time.Second}
-	app.srv.Serve(ln)
-	select {} // srv closed for a restart: wait for os.Exit
+	go app.srv.Serve(ln)
+
+	if os.Getenv("WATERSHED_NO_WINDOW") != "" {
+		select {}
+	}
+	// the tool's own window; returns when it's closed
+	if runAppWindow(url, app) {
+		app.disconnect()
+		app.slog.Close()
+		os.Exit(0)
+	}
+	// no WebView2: use an Edge/Chrome app window, and quit a little while
+	// after it's closed (see watch)
+	if updated {
+		// an existing browser window reconnects by itself after an update
+		time.Sleep(8 * time.Second)
+		app.hub.mu.Lock()
+		had := app.hub.everClient
+		app.hub.mu.Unlock()
+		if had {
+			select {}
+		}
+	} else {
+		time.Sleep(300 * time.Millisecond)
+	}
+	openWindow(url)
+	select {}
 }

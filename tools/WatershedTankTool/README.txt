@@ -11,8 +11,8 @@ First run: if Windows SmartScreen says "Windows protected your PC", click
 More info > Run anyway. The exe isn't code-signed.
 
 USING IT
-1. Double-click WatershedTankTool.exe. The tool's window opens (it uses
-   Edge, which is already on Windows). The first run also puts a "Watershed
+1. Double-click WatershedTankTool.exe. The tool opens in its own window
+   (no browser needed). The first run also puts a "Watershed
    Tank Tool" shortcut on the Desktop and in the Start Menu, so use those
    from then on. Nothing else to install. The flasher (esptool) downloads
    itself the first time firmware is installed.
