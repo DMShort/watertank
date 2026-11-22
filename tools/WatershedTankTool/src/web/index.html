@@ -303,7 +303,7 @@
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-let update = {}, flash = null, loadedVersion = null;
+let update = {}, flash = null, loadedVersion = null, missingDrivers = [];
 let status = {}, cfg = null, last = null, lastAt = 0, history = [], shape = "VERT", dirty = false, testRunning = false;
 
 function toast(msg, bad){
@@ -351,6 +351,11 @@ function renderStatus(){
   } else if (status.connected){
     dot.className = "dot bad"; txt.textContent = `${status.port} · not a Watershed node`;
     bannerCls = "info"; bannerHtml = `<b>${status.port}</b> is open, but nothing answered as a Watershed node. Check it's the right port, and that the board is running tank_node.ino v${status.min_fw}.`;
+  } else if (missingDrivers.length){
+    dot.className = "dot bad"; txt.textContent = "USB driver needed";
+    bannerCls = "fail"; bannerHtml = `Windows has seen the board's USB chip (<b>${missingDrivers.map(esc).join(", ")}</b>) but has no driver for it, so it can't talk to the node. This is a one-time install:<br>` +
+      (missingDrivers.some(d => d.includes("CP210x")) ? `1. Download the <b>CP210x Universal Windows Driver</b> from <b>silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers</b> and unzip it.<br>2. Right-click <b>silabser.inf</b> → <b>Install</b> (say Yes to the prompt).<br>` : `1. Download the <b>CH340/CH341 driver</b> from <b>wch-ic.com</b> and run it.<br>`) +
+      `Then unplug the board, plug it back in, and press Auto-detect.`;
   } else if (status.auto){
     dot.className = "dot busy"; txt.textContent = "Waiting for a node… plug it in by USB";
     bannerCls = "info"; bannerHtml = `Plug the tank node into this laptop by USB and it will be found automatically. If nothing happens after 10 seconds: check the cable carries data (some are charge-only), close the Arduino IDE Serial Monitor, and check Device Manager shows a <b>Silicon Labs CP210x</b> COM port. If it doesn't, install the CP210x driver from silabs.com.`;
@@ -416,6 +421,12 @@ function verLess(a, b){
   return false;
 }
 async function loadPorts(){
+  try{
+    const dr = await (await fetch("/api/drivers")).json();
+    const had = missingDrivers.join();
+    missingDrivers = (status.connected ? [] : (dr.missing || []));
+    if (had !== missingDrivers.join()) renderStatus();
+  }catch(e){}
   try{
     const ports = await (await fetch("/api/ports")).json();
     const sel = $("portsel"), prev = sel.value || status.port;

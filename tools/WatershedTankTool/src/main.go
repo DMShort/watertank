@@ -897,6 +897,9 @@ func (a *App) routes() *http.ServeMux {
 	}
 
 	m.HandleFunc("/api/ports", func(w http.ResponseWriter, r *http.Request) { jsonOut(w, listPorts()) })
+	m.HandleFunc("/api/drivers", func(w http.ResponseWriter, r *http.Request) {
+		jsonOut(w, map[string]any{"missing": missingDrivers()})
+	})
 	post("/api/connect", func(w http.ResponseWriter, b map[string]any) {
 		name := str(b, "port")
 		if name == "" {

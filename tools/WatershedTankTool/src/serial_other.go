@@ -76,3 +76,5 @@ func revealFile(path string) { openFolder(filepath.Dir(path)) }
 func showMessage(title, text string) { fmt.Println(title + ": " + text) }
 
 func ensureShortcuts(a *App) {}
+
+func missingDrivers() []string { return nil }

@@ -342,3 +342,65 @@ func ensureShortcuts(a *App) {
 	os.WriteFile(flag, []byte(exe), 0o644)
 	a.sysLine("created Desktop and Start Menu shortcuts to %s", exe)
 }
+
+// usbSerialChips: USB-serial chips used on ESP32 boards, with the driver to
+// install if Windows hasn't got one.
+var usbSerialChips = map[string]string{
+	"VID_10C4&PID_EA60": "Silicon Labs CP210x",
+	"VID_1A86&PID_7523": "WCH CH340",
+	"VID_1A86&PID_55D4": "WCH CH9102",
+}
+
+// missingDrivers lists board USB chips Windows has seen but never installed
+// a driver for: the device is in Enum\USB but has no driver service and no
+// COM port assigned. (The record stays after unplugging, so this can show
+// for a board that isn't plugged in right now.)
+func missingDrivers() []string {
+	root, ok := regOpen(syscall.HKEY_LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Enum\USB`)
+	if !ok {
+		return nil
+	}
+	defer syscall.RegCloseKey(root)
+	seen := map[string]bool{}
+	var out []string
+	for _, devKey := range regSubkeys(root) {
+		up := strings.ToUpper(devKey)
+		var chip string
+		for id, name := range usbSerialChips {
+			if strings.HasPrefix(up, id) {
+				chip = name
+			}
+		}
+		if chip == "" || seen[chip] {
+			continue
+		}
+		dk, ok := regOpen(root, devKey)
+		if !ok {
+			continue
+		}
+		insts := regSubkeys(dk)
+		working := false
+		for _, inst := range insts {
+			ik, ok := regOpen(dk, inst)
+			if !ok {
+				continue
+			}
+			svc := regString(ik, "Service")
+			port := ""
+			if pk, ok := regOpen(ik, `Device Parameters`); ok {
+				port = regString(pk, "PortName")
+				syscall.RegCloseKey(pk)
+			}
+			syscall.RegCloseKey(ik)
+			if svc != "" && port != "" {
+				working = true
+			}
+		}
+		syscall.RegCloseKey(dk)
+		if len(insts) > 0 && !working {
+			seen[chip] = true
+			out = append(out, chip)
+		}
+	}
+	return out
+}

@@ -7,6 +7,8 @@
 #  - For a bigger jump, push a tag yourself:  git tag -a v0.5.0 -m "notes"
 #    then  git push origin v0.5.0
 #  - To push without releasing, put [skip ci] in the commit message.
+#    GitHub matches it ANYWHERE in the message (body too), so don't mention
+#    it in passing in a commit you do want released.
 #
 # Copies of the Watershed Tank Tool pick new releases up automatically.
 name: Release
