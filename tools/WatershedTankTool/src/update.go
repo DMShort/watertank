@@ -461,6 +461,7 @@ func (a *App) restart(exe string) {
 	a.hub.send("restarting", appVersion)
 	time.Sleep(400 * time.Millisecond)
 	a.disconnect()
+	a.slog.Close()
 	if a.srv != nil {
 		a.srv.Close() // free the port for the new copy
 	}

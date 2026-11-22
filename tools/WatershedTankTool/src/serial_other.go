@@ -70,3 +70,5 @@ func openWindow(url string)  { exec.Command("xdg-open", url).Start() }
 func openFolder(path string) { exec.Command("xdg-open", path).Start() }
 
 func hideWindow(c *exec.Cmd) {}
+
+func revealFile(path string) { openFolder(filepath.Dir(path)) }

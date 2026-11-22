@@ -28,6 +28,13 @@ USING IT
    then Start. Results are saved in the "logs" folder next to the exe. Send
    the _summary.txt file to Dave.
 
+IF SOMETHING GOES WRONG
+Everything the tool and the node do is logged in the "logs" folder
+(session_<date>_<time>.txt). In the "Problem? Send Dave the logs" box:
+- Save support bundle: makes one .zip with the logs, recent tests and the
+  node's settings, and opens the folder with it selected. Email it to Dave.
+- Copy diagnostics: copies a short summary to paste into a text or email.
+
 UPDATES
 The tool checks GitHub when it starts and every 6 hours. A newer tool
 installs itself and the window reloads. Newer node firmware shows an

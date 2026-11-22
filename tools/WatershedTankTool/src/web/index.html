@@ -273,6 +273,18 @@
       </details>
       <div class="updline"><span id="updText">Checking for updates…</span><button id="updCheck">Check now</button><button class="primary" id="updTool" style="display:none">Update tool</button></div>
     </section>
+
+    <section class="card">
+      <h2>Problem? Send Dave the logs</h2>
+      <p class="hint" style="margin-top:0">Everything the tool and the node do is recorded in a log file. If something goes wrong, save a support bundle and send it to Dave, or copy the diagnostics into a message.</p>
+      <div class="actions">
+        <button class="primary" id="supBundle">Save support bundle</button>
+        <button id="supCopy">Copy diagnostics</button>
+        <button id="supLogs">Open logs folder</button>
+      </div>
+      <div class="paths" id="supMsg"></div>
+      <textarea id="supText" readonly style="display:none;width:100%;height:160px;margin-top:10px;font:12px Consolas,ui-monospace,monospace;border:1px solid var(--line);border-radius:7px;padding:8px"></textarea>
+    </section>
   </div>
 
   <details class="console card" id="console">
@@ -351,6 +363,7 @@ function renderStatus(){
   for (const id of ["btnApply","btnReload","capEmpty","capFull","cmdSend"]) $(id).disabled = !status.connected || (id !== "cmdSend" && !ready);
   $("tStart").disabled = !ready || testRunning;
   renderFw();
+  if (status.session_log && !$("supMsg").textContent) $("supMsg").textContent = "This session is being logged to " + status.session_log;
 }
 
 // ---------- firmware & updates ----------
@@ -668,6 +681,18 @@ $("fwFlashFile").onclick = async () => {
     const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
   }catch(e){ flash = null; $("fwProg").style.display = "none"; renderFw(); toast(e.message, true); }
 };
+$("supBundle").onclick = async () => {
+  try{ $("supBundle").disabled = true; const r = await api("/api/support/bundle", {reveal:true});
+    $("supMsg").innerHTML = `Saved <b>${esc(r.path)}</b>. The folder has opened with the file selected. Attach it to an email or message to Dave.`; toast("Support bundle saved"); }
+  catch(e){ toast(e.message, true); } finally{ $("supBundle").disabled = false; }
+};
+$("supCopy").onclick = async () => {
+  let text = "";
+  try{ text = (await api("/api/support/diagnostics")).text; }catch(e){ toast(e.message, true); return; }
+  try{ await navigator.clipboard.writeText(text); $("supText").style.display = "none"; $("supMsg").textContent = "Diagnostics copied. Paste them into a message to Dave."; toast("Copied to clipboard"); }
+  catch(e){ const t = $("supText"); t.value = text; t.style.display = ""; t.focus(); t.select(); $("supMsg").textContent = "Couldn't copy automatically. The text is selected below: press Ctrl+C."; }
+};
+$("supLogs").onclick = async () => { try{ await api("/api/openlogs"); }catch(e){ toast(e.message, true); } };
 $("updCheck").onclick = async () => { try{ update.busy = "Checking…"; renderFw(); await api("/api/update/check"); }catch(e){ toast(e.message, true); } };
 $("updTool").onclick = async () => { try{ await api("/api/update/tool"); }catch(e){ toast(e.message, true); } };
 $("portsel").addEventListener("change", renderFw);

@@ -283,6 +283,13 @@ func openWindow(url string) {
 
 func openFolder(path string) { exec.Command("explorer", path).Start() }
 
+// open Explorer with the file selected
+func revealFile(path string) {
+	cmd := exec.Command("explorer")
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `explorer /select,"` + path + `"`}
+	cmd.Start()
+}
+
 // run esptool without flashing up its own console window
 func hideWindow(c *exec.Cmd) {
 	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW

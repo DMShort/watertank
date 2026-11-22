@@ -372,6 +372,7 @@ type App struct {
 	upd       *Updater
 	flash     *FlashJob
 	srv       *http.Server
+	slog      *SessionLog
 }
 
 func (a *App) status() map[string]any {
@@ -385,7 +386,8 @@ func (a *App) statusLocked() map[string]any {
 		"connected": a.connected, "port": a.portName, "ident": a.ident,
 		"legacy": a.legacy, "auto": a.auto, "probing": a.probing, "min_fw": minFW,
 		"app_version": appVersion, "log_dir": a.logDir,
-		"flashing": a.flash != nil && a.flash.Running,
+		"flashing":    a.flash != nil && a.flash.Running,
+		"session_log": a.slog.Path(),
 	}
 	return st
 }
@@ -393,6 +395,7 @@ func (a *App) statusLocked() map[string]any {
 func (a *App) pushStatus() { a.hub.send("status", a.status()) }
 
 func (a *App) logLine(s string) {
+	a.slog.Line(s)
 	a.lines = append(a.lines, s)
 	if len(a.lines) > 600 {
 		a.lines = a.lines[len(a.lines)-500:]
@@ -610,6 +613,7 @@ func (a *App) watch() {
 		a.hub.mu.Unlock()
 		if idle {
 			a.disconnect()
+			a.slog.Close()
 			os.Exit(0)
 		}
 		a.mu.Lock()
@@ -1065,9 +1069,24 @@ func (a *App) routes() *http.ServeMux {
 		}
 		jsonOut(w, map[string]any{"ok": true})
 	})
+	post("/api/support/bundle", func(w http.ResponseWriter, b map[string]any) {
+		p, err := a.supportBundle()
+		if err != nil {
+			errOut(w, 500, "couldn't save the support bundle: "+err.Error())
+			return
+		}
+		go func() { pruneFiles(a.logDir, "support_", 10) }()
+		if reveal, _ := b["reveal"].(bool); reveal {
+			revealFile(p)
+		}
+		jsonOut(w, map[string]any{"path": p})
+	})
+	post("/api/support/diagnostics", func(w http.ResponseWriter, b map[string]any) {
+		jsonOut(w, map[string]any{"text": a.diagnostics()})
+	})
 	post("/api/quit", func(w http.ResponseWriter, b map[string]any) {
 		jsonOut(w, map[string]any{"ok": true})
-		go func() { time.Sleep(300 * time.Millisecond); a.disconnect(); os.Exit(0) }()
+		go func() { time.Sleep(300 * time.Millisecond); a.disconnect(); a.slog.Close(); os.Exit(0) }()
 	})
 	return m
 }
@@ -1133,13 +1152,17 @@ func main() {
 
 	app := &App{hub: &Hub{clients: map[chan []byte]struct{}{}}, failed: map[string]bool{}, auto: true,
 		logDir: pickLogDir(), upd: newUpdater()}
+	app.slog = newSessionLog(app.logDir, sessionHeader())
+	if updated {
+		app.sysLine("restarted after updating to v%s", appVersion)
+	}
 	go app.watch()
 	if app.upd.enabled() {
 		go app.updateLoop()
 	}
 
 	fmt.Println("Window:", url)
-	fmt.Println("Test logs:", app.logDir)
+	fmt.Println("Logs:", app.logDir)
 	if app.upd.enabled() {
 		fmt.Println("Updates from: github.com/" + app.upd.repo)
 	}
