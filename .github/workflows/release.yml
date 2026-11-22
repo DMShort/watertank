@@ -1,15 +1,30 @@
-# Builds a release whenever a version tag is pushed, e.g.
-#   git tag -a v0.4.0 -m "What changed (your dad sees this text)"
-#   git push origin v0.4.0
+# Builds and publishes a release (firmware + Windows tool) automatically.
 #
-# It compiles the firmware and the Windows tool, bundles esptool, and
-# publishes them with a manifest.json. Copies of the Watershed Tank Tool
-# pick the new release up automatically.
+#  - Every push to main that changes the firmware, the tool or this workflow
+#    becomes the next patch release: v0.4.1 -> v0.4.2 -> ...
+#    The release notes (what Dad sees) are the commit messages since the last
+#    release, so write those for him.
+#  - For a bigger jump, push a tag yourself:  git tag -a v0.5.0 -m "notes"
+#    then  git push origin v0.5.0
+#  - To push without releasing, put [skip ci] in the commit message.
+#
+# Copies of the Watershed Tank Tool pick new releases up automatically.
 name: Release
 
 on:
   push:
+    branches: [main]
+    paths:
+      - "firmware/**"
+      - "tools/WatershedTankTool/**"
+      - ".github/workflows/release.yml"
     tags: ["v*"]
+  workflow_dispatch: {}
+
+# one release at a time, in order
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -29,28 +44,48 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Version from tag
+      - name: Work out version and notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
-          git for-each-ref "refs/tags/$TAG" --format='%(contents)' | sed '/-----BEGIN PGP/,$d' > release_notes.txt
-          # lightweight tag (no message)? use the commit message, or the text of a
-          # release drafted on the GitHub website
-          if [ "$(git cat-file -t "$TAG")" != "tag" ]; then
-            gh release view "$TAG" --json body -q .body > release_notes.txt 2>/dev/null || true
-            [ -s release_notes.txt ] || git log -1 --format=%B "$TAG" > release_notes.txt
+          git fetch --force --tags -q
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # a tag pushed by hand: use it, and its message as the notes
+            TAG="$GITHUB_REF_NAME"
+            git for-each-ref "refs/tags/$TAG" --format='%(contents)' | sed '/-----BEGIN PGP/,$d' > release_notes.txt
+            if [ "$(git cat-file -t "$TAG")" != "tag" ]; then
+              gh release view "$TAG" --json body -q .body > release_notes.txt 2>/dev/null || true
+              [ -s release_notes.txt ] || git log -1 --format=%B "$TAG" > release_notes.txt
+            fi
+          else
+            # push to main: next patch version after the newest release tag
+            if git tag --points-at HEAD | grep -q '^v'; then
+              echo "This commit is already released ($(git tag --points-at HEAD | tr '\n' ' ')), nothing to do."
+              echo "SKIP=1" >> "$GITHUB_ENV"; exit 0
+            fi
+            LAST=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+            if [ -z "$LAST" ]; then
+              TAG=v0.1.0
+            else
+              IFS=. read -r MA MI PA <<< "${LAST#v}"
+              PA="${PA%%[^0-9]*}"
+              TAG="v${MA}.${MI}.$(( ${PA:-0} + 1 ))"
+            fi
+            {
+              echo "Changes since ${LAST:-the start}:"
+              git log --no-merges --format='- %s' ${LAST:+$LAST..}HEAD
+            } > release_notes.txt
           fi
-          echo "Notes:"; cat release_notes.txt
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          echo "Releasing $TAG"; echo "Notes:"; cat release_notes.txt
 
       # ---------- firmware ----------
       - uses: arduino/setup-arduino-cli@v2
+        if: env.SKIP != '1'
 
       - name: Install ESP32 core and libraries
+        if: env.SKIP != '1'
         run: |
           arduino-cli config init --overwrite
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
@@ -67,14 +102,17 @@ jobs:
           arduino-cli lib list
 
       - name: Stamp firmware version
+        if: env.SKIP != '1'
         run: |
           sed -i -E "s/^#define FW_VERSION \".*\"/#define FW_VERSION \"${VERSION}\"/" firmware/tank_node/tank_node.ino
           grep -n '^#define FW_VERSION' firmware/tank_node/tank_node.ino
 
       - name: Compile firmware
+        if: env.SKIP != '1'
         run: arduino-cli compile --fqbn "$FQBN" --output-dir build/fw --warnings default firmware/tank_node
 
       - name: Collect firmware parts
+        if: env.SKIP != '1'
         run: |
           mkdir -p dist
           cp build/fw/tank_node.ino.bin            dist/fw_app.bin
@@ -87,10 +125,12 @@ jobs:
 
       # ---------- Windows tool ----------
       - uses: actions/setup-go@v5
+        if: env.SKIP != '1'
         with:
           go-version: "1.24"
 
       - name: Build Watershed Tank Tool
+        if: env.SKIP != '1'
         working-directory: tools/WatershedTankTool/src
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath \
@@ -99,6 +139,7 @@ jobs:
 
       # ---------- esptool (official Espressif build) ----------
       - name: Fetch esptool for Windows
+        if: env.SKIP != '1'
         run: |
           curl -fsSL -o esptool.zip "https://github.com/espressif/esptool/releases/download/${ESPTOOL_VERSION}/esptool-${ESPTOOL_VERSION}-win64.zip"
           mkdir -p esptool_zip && unzip -q esptool.zip -d esptool_zip
@@ -107,9 +148,11 @@ jobs:
 
       # ---------- publish ----------
       - name: Write manifest
+        if: env.SKIP != '1'
         run: python3 tools/WatershedTankTool/make_manifest.py dist "$VERSION" "$TAG" release_notes.txt > dist/manifest.json && cat dist/manifest.json
 
       - name: Publish release
+        if: env.SKIP != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -119,5 +162,5 @@ jobs:
           else
             NOTES_ARGS=(--notes-file release_notes.txt)
             [ -s release_notes.txt ] || NOTES_ARGS=(--generate-notes)
-            gh release create "$TAG" dist/* --title "Watershed $TAG" "${NOTES_ARGS[@]}"
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Watershed $TAG" "${NOTES_ARGS[@]}"
           fi
