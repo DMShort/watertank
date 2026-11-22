@@ -11,8 +11,11 @@ First run: if Windows SmartScreen says "Windows protected your PC", click
 More info > Run anyway. The exe isn't code-signed.
 
 USING IT
-1. Double-click WatershedTankTool.exe. A small console window opens, plus the
-   tool's own app window (it uses Edge, which is already on Windows).
+1. Double-click WatershedTankTool.exe. The tool's window opens (it uses
+   Edge, which is already on Windows). The first run also puts a "Watershed
+   Tank Tool" shortcut on the Desktop and in the Start Menu, so use those
+   from then on. Nothing else to install. The flasher (esptool) downloads
+   itself the first time firmware is installed.
 2. Plug the node in by USB. The tool finds it automatically.
    - Nothing found? Try another USB cable (some are charge-only) and check
      Device Manager shows a "Silicon Labs CP210x" COM port. If not, install

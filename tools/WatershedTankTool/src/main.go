@@ -1142,9 +1142,7 @@ func main() {
 	if err != nil {
 		ln, err = net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
-			fmt.Println("Could not start:", err)
-			fmt.Println("Press Enter to close.")
-			fmt.Scanln()
+			showMessage(appName, "The Watershed Tank Tool couldn't start:\n\n"+err.Error())
 			return
 		}
 	}
@@ -1167,6 +1165,9 @@ func main() {
 		fmt.Println("Updates from: github.com/" + app.upd.repo)
 	}
 	fmt.Println("Leave this window open while you use the tool. Closing the app window quits it.")
+	if app.upd.enabled() { // release builds only, not Dave's dev builds
+		go ensureShortcuts(app)
+	}
 	if os.Getenv("WATERSHED_NO_WINDOW") == "" {
 		go func() {
 			if updated {

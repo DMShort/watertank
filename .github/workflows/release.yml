@@ -73,7 +73,7 @@ jobs:
             fi
             {
               echo "Changes since ${LAST:-the start}:"
-              git log --no-merges --format='- %s' ${LAST:+$LAST..}HEAD
+              git log --no-merges --invert-grep --grep='\[skip ci\]' --format='- %s' ${LAST:+$LAST..}HEAD
             } > release_notes.txt
           fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
@@ -134,7 +134,7 @@ jobs:
         working-directory: tools/WatershedTankTool/src
         run: |
           GOOS=windows GOARCH=amd64 go build -trimpath \
-            -ldflags "-s -w -X main.appVersion=${VERSION} -X main.updateRepo=${GITHUB_REPOSITORY}" \
+            -ldflags "-s -w -H windowsgui -X main.appVersion=${VERSION} -X main.updateRepo=${GITHUB_REPOSITORY}" \
             -o "$GITHUB_WORKSPACE/dist/WatershedTankTool.exe" .
 
       # ---------- esptool (official Espressif build) ----------

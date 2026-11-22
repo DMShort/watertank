@@ -294,3 +294,51 @@ func revealFile(path string) {
 func hideWindow(c *exec.Cmd) {
 	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 }
+
+var (
+	user32          = syscall.NewLazyDLL("user32.dll")
+	procMessageBoxW = user32.NewProc("MessageBoxW")
+)
+
+// showMessage pops up a standard Windows message box (release builds have
+// no console window to print to)
+func showMessage(title, text string) {
+	t, _ := syscall.UTF16PtrFromString(title)
+	m, _ := syscall.UTF16PtrFromString(text)
+	procMessageBoxW.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x40) // MB_ICONINFORMATION
+}
+
+// ensureShortcuts adds Desktop and Start Menu shortcuts to this exe, once.
+// Updates replace the exe in place, so the shortcuts stay valid.
+func ensureShortcuts(a *App) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	if r, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = r
+	}
+	base, err := os.UserConfigDir() // %AppData%
+	if err != nil {
+		return
+	}
+	dir := filepath.Join(base, "WatershedTankTool")
+	flag := filepath.Join(dir, "shortcuts.txt")
+	if b, err := os.ReadFile(flag); err == nil && strings.TrimSpace(string(b)) == exe {
+		return // already done for this location (deleted ones stay deleted)
+	}
+	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+	script := `$ErrorActionPreference='Stop'; $w=New-Object -ComObject WScript.Shell; ` +
+		`foreach($d in @([Environment]::GetFolderPath('Desktop'),[Environment]::GetFolderPath('Programs'))){ ` +
+		`$s=$w.CreateShortcut((Join-Path $d 'Watershed Tank Tool.lnk')); $s.TargetPath=` + q(exe) + `; ` +
+		`$s.WorkingDirectory=` + q(filepath.Dir(exe)) + `; $s.Description='Set up, test and update the Watershed tank node'; $s.Save() }`
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
+	hideWindow(cmd)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		a.sysLine("couldn't create shortcuts: %v %s", err, strings.TrimSpace(string(out)))
+		return
+	}
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(flag, []byte(exe), 0o644)
+	a.sysLine("created Desktop and Start Menu shortcuts to %s", exe)
+}

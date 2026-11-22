@@ -72,3 +72,7 @@ func openFolder(path string) { exec.Command("xdg-open", path).Start() }
 func hideWindow(c *exec.Cmd) {}
 
 func revealFile(path string) { openFolder(filepath.Dir(path)) }
+
+func showMessage(title, text string) { fmt.Println(title + ": " + text) }
+
+func ensureShortcuts(a *App) {}

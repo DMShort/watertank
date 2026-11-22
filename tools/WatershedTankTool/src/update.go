@@ -466,11 +466,11 @@ func (a *App) restart(exe string) {
 		a.srv.Close() // free the port for the new copy
 	}
 	cmd := exec.Command(exe, "--updated")
-	cmd.Stdout, cmd.Stderr, cmd.Stdin = os.Stdout, os.Stderr, os.Stdin
+	// no std handles: release builds have no console (and passing its
+	// invalid handles would make Start fail)
 	cmd.Env = os.Environ()
 	if err := cmd.Start(); err != nil {
-		fmt.Println("Restart failed - please start the tool again:", err)
-		time.Sleep(5 * time.Second)
+		showMessage(appName, "The update was installed, but the tool couldn't restart itself.\nPlease start it again.\n\n"+err.Error())
 	}
 	os.Exit(0)
 }
